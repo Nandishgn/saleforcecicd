@@ -1,0 +1,48 @@
+trigger:
+  branches:
+    include:
+      - main
+
+parameters:
+  - name: targetOrg
+    displayName: 'Select Target Org'
+    type: string
+    values:
+      - 'Org1'  # Name of the first org
+      - 'Org2'  # Name of the second org
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+
+# Step 1: Install Salesforce CLI
+- task: SFDXInstaller@1
+  displayName: 'Install Salesforce CLI'
+
+# Step 2: Authenticate to Salesforce Org1
+- script: |
+    if [[ '${{ parameters.targetOrg }}' == 'Org1' ]]; then
+      echo "Authenticating to Org1"
+      sfdx auth:jwt:grant --clientid $(SF_CLIENT_ID_Org1) --jwtkeyfile $(SF_PRIVATE_KEY_FILE_Org1) --username $(SF_USERNAME_Org1) --instanceurl https://login.salesforce.com
+    fi
+  displayName: 'Authenticate to Salesforce Org1'
+
+# Step 3: Authenticate to Salesforce Org2
+- script: |
+    if [[ '${{ parameters.targetOrg }}' == 'Org2' ]]; then
+      echo "Authenticating to Org2"
+      sfdx auth:jwt:grant --clientid $(SF_CLIENT_ID_Org2) --jwtkeyfile $(SF_PRIVATE_KEY_FILE_Org2) --username $(SF_USERNAME_Org2) --instanceurl https://login.salesforce.com
+    fi
+  displayName: 'Authenticate to Salesforce Org2'
+
+# Step 4: Deploy to the Selected Org
+- script: |
+    if [[ '${{ parameters.targetOrg }}' == 'Org1' ]]; then
+      echo "Deploying to Org1"
+      sfdx force:source:deploy -u $(SF_USERNAME_Org1) -p force-app --checkonly --testlevel RunLocalTests
+    elif [[ '${{ parameters.targetOrg }}' == 'Org2' ]]; then
+      echo "Deploying to Org2"
+      sfdx force:source:deploy -u $(SF_USERNAME_Org2) -p force-app --checkonly --testlevel RunLocalTests
+    fi
+  displayName: 'Deploy to Selected Org'
