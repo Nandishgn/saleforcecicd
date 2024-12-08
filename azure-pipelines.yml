@@ -1,25 +1,84 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
+# Trigger the pipeline when changes are pushed to the 'main' branch
 trigger:
-  branches:
-    include:
-      - main
+- main
 
-pool:
-  vmImage: 'ubuntu-latest'
+# Define pipeline variables
+variables:
+  buildConfiguration: 'Release'
 
-steps:
-- task: GitHubCheckout@1
-  displayName: 'Checkout Code'
+# Define the stages in the pipeline
+stages:
+- stage: Build
+  displayName: "Build the Application"
+  jobs:
+  - job: BuildJob
+    displayName: "Build Job"
+    pool:
+      vmImage: 'ubuntu-latest' # Choose the build agent
+    steps:
+    # Check out the code from the repository
+    - task: Checkout@1
+      displayName: "Checkout Code"
+      inputs:
+        clean: true
 
-- task: SFDXInstaller@1
-  displayName: 'Install SFDX CLI'
+    # Install dependencies (e.g., Node.js, Python, or .NET dependencies)
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.x'
+    - script: |
+        pip install -r requirements.txt
+      displayName: "Install Dependencies"
 
-- script: sfdx auth:jwt:grant --clientid $(SF_CLIENT_ID) --jwtkeyfile $(SF_JWT_KEY) --username $(SF_USERNAME) --instanceurl https://login.salesforce.com
-  displayName: 'Authenticate with Salesforce'
+    # Build or compile the application
+    - script: |
+        echo "Building application..."
+        # Insert build commands here (e.g., python setup.py build)
+      displayName: "Build Application"
 
-- script: sfdx force:source:deploy -p force-app
-  displayName: 'Deploy to Salesforce'
+    # Publish the build artifacts for deployment
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: $(Build.ArtifactStagingDirectory)
+        artifactName: drop
+        publishLocation: Container
+
+- stage: Deploy
+  displayName: "Deploy to Azure"
+  dependsOn: Build
+  jobs:
+  - job: DeployToResourceGroup1
+    displayName: "Deploy to Azure Resource Group 1"
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    # Deploy resources using Azure CLI
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'ServiceConnectionOrg1' # Replace with your service connection name
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Deploying to Resource Group 1..."
+          az group deployment create \
+            --resource-group myResourceGroup1 \
+            --template-file mainTemplate.json \
+            --parameters @parameters1.json
+
+  - job: DeployToResourceGroup2
+    displayName: "Deploy to Azure Resource Group 2"
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    # Deploy resources using Azure CLI
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'ServiceConnectionOrg2' # Replace with your service connection name
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Deploying to Resource Group 2..."
+          az group deployment create \
+            --resource-group myResourceGroup2 \
+            --template-file mainTemplate.json \
+            --parameters @parameters2.json
